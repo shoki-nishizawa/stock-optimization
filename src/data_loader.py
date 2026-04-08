@@ -2,6 +2,7 @@ import json
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import time
 import concurrent.futures
 
 def load_config(config_path="config.json"):
@@ -54,17 +55,18 @@ def extract_candidates(ticker_dict, strategy_config):
 
     print(f"yfinanceから {len(tickers)} 銘柄の過去1年分のデータ一括ダウンロードを開始します...")
     
-    data = yf.download(tickers, period="1y", group_by="ticker", progress=False, actions=True)
+    data = yf.download(tickers, period="1y", group_by="ticker", progress=False, actions=True, threads=False)
     
     def fetch_info(tk):
         try:
+            time.sleep(0.5) # レートリミット対策
             return tk, yf.Ticker(tk).info
         except:
             return tk, {}
 
     print("yfinanceからファンダメンタルズ情報（PER, ROE）を取得中...")
     info_dict = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         futures = {executor.submit(fetch_info, tk): tk for tk in tickers}
         for future in concurrent.futures.as_completed(futures):
             tk, info = future.result()
