@@ -1,0 +1,36 @@
+name: Update Stock Database
+
+on:
+  schedule:
+    - cron: '0 19 * * *' # 日本時間の午前4時に毎日実行
+  workflow_dispatch: # 手動実行用ボタンも有効化
+
+jobs:
+  update-database:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # リポジトリへの書き込み権限
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run update script
+        run: python scripts/update_database.py
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/stock_database.csv
+          # 差分がある場合のみコミット
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update stock database [skip ci]" && git push)
