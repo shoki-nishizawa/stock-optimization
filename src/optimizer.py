@@ -1,0 +1,80 @@
+from ortools.sat.python import cp_model
+
+def optimize_portfolio(candidates, budget):
+    """
+    候補リストの中から、予算内で期待利益(lot_profit)を最大化する組み合わせを
+    ナップサック問題としてCP-SATで解く。
+    """
+    print("-" * 50)
+    print(f"【投資最適化】予算: {budget:,} 円 の範囲で期待利益を最大化します...")
+    
+    model = cp_model.CpModel()
+    
+    x = {}
+    for data in candidates:
+        max_shares = int(budget // data['share_price'])
+        if max_shares < 0: max_shares = 0
+        x[data['ticker']] = model.NewIntVar(0, max_shares, f"x_{data['ticker']}")
+        
+    total_cost_expr = []
+    for data in candidates:
+        total_cost_expr.append(x[data['ticker']] * data['share_price'])
+    model.Add(sum(total_cost_expr) <= budget)
+    
+    total_profit_expr = []
+    for data in candidates:
+        total_profit_expr.append(x[data['ticker']] * data['share_profit'])
+            
+    model.Maximize(sum(total_profit_expr))
+    
+    solver = cp_model.CpSolver()
+    status = solver.Solve(model)
+    
+    print("-" * 50)
+    print("【最適化結果】")
+    if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
+        total_invested = 0
+        expected_profit = 0
+        portfolio = []
+        
+        for data in candidates:
+            shares = solver.Value(x[data['ticker']])
+            if shares > 0:
+                cost = shares * data['share_price']
+                profit = shares * data['share_profit']
+                print(f"■ {data['name']} ({data['ticker']}): {shares:,}株購入")
+                print(f"   -> 購入金額: {cost:,}円, 単年見込み期待利益: {profit:,}円")
+                print(f"      （内訳: 値上がり期待 {data['expected_capital_gain']*shares:,}円 + 配当金期待 {data['expected_dividend']*shares:,}円）")
+                total_invested += cost
+                expected_profit += profit
+                
+                portfolio.append({
+                    'ticker': data['ticker'],
+                    'name': data['name'],
+                    'shares': shares,
+                    'cost': cost,
+                    'profit': profit,
+                    'pe': data.get('pe', 0.0),
+                    'roe': data.get('roe', 0.0),
+                    'custom_return': data.get('custom_return', 0.0),
+                    'expected_capital_gain': data['expected_capital_gain']*shares,
+                    'expected_dividend': data['expected_dividend']*shares,
+                    'analyst_rating': data.get('analyst_rating', '-')
+                })
+                
+        print(f"\n合計購入金額: {total_invested:,} 円 （残高: {budget - total_invested:,} 円）")
+        print(f"見込み期待利益合計: {expected_profit:,} 円")
+        
+        return {
+            'success': True,
+            'portfolio': portfolio,
+            'total_invested': total_invested,
+            'expected_profit': expected_profit,
+            'remaining_budget': budget - total_invested
+        }
+    else:
+        print("予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。")
+        return {
+            'success': False,
+            'message': '予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。'
+        }

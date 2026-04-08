@@ -1,0 +1,11 @@
+{
+  "budget": 2000000,
+  "filter": {
+    "sector": ["医薬品"],
+    "market": ["プライム（内国株式）"]
+  },
+  "strategy": {
+    "sort_by": "volatility_high",
+    "top_n": 10
+  }
+}
