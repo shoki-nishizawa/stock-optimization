@@ -1,0 +1,37 @@
+name: Fetch Fundamentals (Monthly)
+
+on:
+  schedule:
+    - cron: '0 0 1 * *' # 日本時間の毎月1日午前9時に実行
+  workflow_dispatch: # いつでも手動実行できるようにする
+
+jobs:
+  fetch-fundamentals:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run fetch script (Note: This may take a long time or get blocked)
+        run: python scripts/fetch_fundamentals_local.py
+
+      - name: Commit and push partial or full progress
+        # 途中でスクリプトがエラー終了した場合でもコミットに進ませるおまじない
+        if: always() 
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add data/fundamentals.csv
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-fetch fundamentals (monthly) [skip ci]" && git push)
