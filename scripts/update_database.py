@@ -2,7 +2,6 @@ import json
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import concurrent.futures
 import time
 import os
 
@@ -10,6 +9,7 @@ def update_database():
     output_dir = "data"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, "stock_database.csv")
+    fundamentals_path = os.path.join(output_dir, "fundamentals.csv")
 
     print("JPXから銘柄一覧データ(data_j.xls)をダウンロードして読み込み中...")
     url = "https://www.jpx.co.jp/markets/statistics-equities/misc/tvdivq0000001vg2-att/data_j.xls"
@@ -31,7 +31,7 @@ def update_database():
             }
 
     print(f"JPX銘柄マスタから {len(tickers_to_process)} 社を取得しました。")
-    print("過去1年分の価格データを一括ダウンロード中...")
+    print("過去1年分の価格データを一括ダウンロード中...（これは数秒〜十数秒で終わります）")
     
     data = yf.download(tickers_to_process, period="1y", group_by="ticker", progress=False, actions=True, threads=False)
 
@@ -54,7 +54,7 @@ def update_database():
         current_price = close_series.iloc[-1]
         start_price = close_series.iloc[0]
         
-        if current_price > 1000000: continue
+        if pd.isna(current_price) or current_price <= 0 or current_price > 1000000: continue
             
         annual_return = float((current_price - start_price) / start_price)
         daily_returns = close_series.pct_change().dropna()
@@ -73,51 +73,37 @@ def update_database():
         valid_tickers.append(tk)
 
     print(f"有効な株価データを持つ銘柄数: {len(valid_tickers)} / {len(tickers_to_process)}")
-    print("ファンダメンタルズ情報を個別に取得中（※1社ずつ取得するため数十分かかります）...")
 
-    def fetch_fundamentals(tk):
-        try:
-            time.sleep(0.5) 
-            info = yf.Ticker(tk).info
-            return tk, info
-        except Exception as e:
-            return tk, {}
-
-    fundamentals_dict = {}
-    
-    processed_count = 0
-    total = len(valid_tickers)
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        futures = {executor.submit(fetch_fundamentals, tk): tk for tk in valid_tickers}
-        for future in concurrent.futures.as_completed(futures):
-            tk, info = future.result()
-            fundamentals_dict[tk] = info
-            
-            processed_count += 1
-            if processed_count % 100 == 0:
-                print(f"詳細取得進捗: {processed_count} / {total} 完了")
+    # ファンダメンタルズCSVの読み込み
+    fund_dict = {}
+    if os.path.exists(fundamentals_path):
+        print(f"ローカルからアップロードされた {fundamentals_path} を読み込みます。")
+        df_fund = pd.read_csv(fundamentals_path)
+        for _, row in df_fund.iterrows():
+            fund_dict[row['ticker']] = {
+                'pe': row['pe'],
+                'roe': row['roe'],
+                'analyst_rating_raw': row['analyst_rating_raw']
+            }
+    else:
+        print(f"⚠️ {fundamentals_path} が見つかりませんでした。PEとROEは0.0として処理されます。")
 
     results = []
     
     rating_map = {
         'strong_buy': '強気買い', 'buy': '買い', 'hold': '中立',
-        'underperform': 'やや弱気', 'sell': '売り', 'strong_sell': '強気売り', 'none': '-', 'None': '-'
+        'underperform': 'やや弱気', 'sell': '売り', 'strong_sell': '強気売り', 'none': '-', 'NaN': '-', 'nan': '-'
     }
 
     for tk in valid_tickers:
         h_stats = historical_stats[tk]
-        info = fundamentals_dict.get(tk, {})
         
-        trailing_pe = info.get('trailingPE')
-        forward_pe = info.get('forwardPE')
-        pe = trailing_pe if trailing_pe is not None else (forward_pe if forward_pe is not None else 0.0)
-        
-        roe = info.get('returnOnEquity', 0.0)
-        if roe is None: roe = 0.0
-        
-        analyst_rating_raw = str(info.get('recommendationKey', 'None')).lower()
-        analyst_rating = rating_map.get(analyst_rating_raw, str(analyst_rating_raw).title() if str(analyst_rating_raw) != 'none' else '-')
+        # ファンダメンタルズの取得（CSVから）
+        fund_info = fund_dict.get(tk, {'pe': 0.0, 'roe': 0.0, 'analyst_rating_raw': 'none'})
+        pe = float(fund_info['pe']) if pd.notna(fund_info['pe']) else 0.0
+        roe = float(fund_info['roe']) if pd.notna(fund_info['roe']) else 0.0
+        analyst_rating_raw = str(fund_info['analyst_rating_raw'])
+        analyst_rating = rating_map.get(analyst_rating_raw, analyst_rating_raw.title() if analyst_rating_raw not in ['none', 'nan', 'NaN'] else '-')
 
         results.append({
             'ticker': tk,
@@ -136,6 +122,7 @@ def update_database():
     df_out = pd.DataFrame(results)
     df_out.to_csv(output_path, index=False, encoding='utf-8-sig')
     print(f"🎉 データベース更新完了！ {len(df_out)}件のデータを {output_path} に保存しました。")
+    print("このスクリプトは yf.Ticker(tk).info へのアクセスを行わないため、非常に高速に終了します！")
 
 if __name__ == "__main__":
     update_database()
