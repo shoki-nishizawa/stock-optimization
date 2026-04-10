@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 import os
+import streamlit as st
 
 DB_PATH = "data/stock_database.csv"
 
@@ -12,6 +13,7 @@ def load_config(config_path="config.json"):
             return json.load(f)
     return {}
 
+@st.cache_data
 def get_jpx_tickers(filter_config):
     """
     構築済みのローカルCSVデータベースから銘柄一覧と基本情報を取得し、
@@ -40,6 +42,7 @@ def get_jpx_tickers(filter_config):
     print(f"データベースから条件に合致する銘柄を {len(ticker_dict)} 社抽出しました。")
     return ticker_dict
 
+@st.cache_data
 def extract_candidates(ticker_dict, strategy_config):
     """
     ローカルCSVから全銘柄のファンダメンタルズ情報を読み込み、ソートロジックを適用。
