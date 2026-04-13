@@ -80,16 +80,47 @@ if st.sidebar.button("最適化を実行", type="primary"):
             
             if not df_portfolio.empty:
                 df_portfolio = df_portfolio[['ticker', 'name', 'analyst_rating', 'shares', 'cost', 'pe', 'roe', 'custom_return', 'profit']]
-                
-                # フォーマット調整
-                df_portfolio['pe'] = df_portfolio['pe'].apply(lambda x: f"{x:.1f}倍")
-                df_portfolio['roe'] = df_portfolio['roe'].apply(lambda x: f"{x*100:.1f}%")
-                df_portfolio['custom_return'] = df_portfolio['custom_return'].apply(lambda x: f"{x*100:.1f}%")
-                
                 df_portfolio.columns = ['コード', '銘柄名', 'アナリスト評価', '購入株数', '購入金額(円)', 'PER', 'ROE', '予想利益率', '合計予想利益額(円)']
                 
+                # 条件付きカラーリング
+                def color_per(val):
+                    if val >= 15:
+                        return 'color: #4A90D9; font-weight: bold'
+                    else:
+                        return 'color: #D94A4A; font-weight: bold'
+                
+                def color_roe(val):
+                    if val >= 0.10:
+                        return 'color: #4A90D9; font-weight: bold'
+                    else:
+                        return 'color: #D94A4A; font-weight: bold'
+                
+                def color_analyst(val):
+                    rating_colors = {
+                        '強気買い': 'color: #4A90D9; font-weight: bold',
+                        '買い': 'color: #4A90D9; font-weight: bold',
+                        '中立': 'color: #4AA84A; font-weight: bold',
+                        'やや弱気': 'color: #D9A04A; font-weight: bold',
+                        '売り': 'color: #D94A4A; font-weight: bold',
+                    }
+                    return rating_colors.get(val, 'color: #888888')
+                
+                # Styler適用
+                styled = (df_portfolio.style
+                    .applymap(color_per, subset=['PER'])
+                    .applymap(color_roe, subset=['ROE'])
+                    .applymap(color_analyst, subset=['アナリスト評価'])
+                    .format({
+                        'PER': '{:.1f}倍',
+                        'ROE': lambda x: f'{x*100:.1f}%',
+                        '予想利益率': lambda x: f'{x*100:.1f}%',
+                        '購入金額(円)': '{:,.0f}',
+                        '合計予想利益額(円)': '{:,.0f}',
+                    })
+                )
+                
                 # テーブル表示
-                st.dataframe(df_portfolio, hide_index=True, use_container_width=True)
+                st.dataframe(styled, hide_index=True, use_container_width=True)
                 st.success("最適化計算が完了しました！ サイドバーから条件を変えて再シミュレーションできます。")
             else:
                 st.warning("予算内で買える銘柄がありませんでした。")
