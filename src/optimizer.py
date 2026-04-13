@@ -1,26 +1,74 @@
 from ortools.sat.python import cp_model
 
-def optimize_portfolio(candidates, budget):
+def optimize_portfolio(candidates, budget, risk_constraints=None):
     """
     候補リストの中から、予算内で期待利益(lot_profit)を最大化する組み合わせを
     ナップサック問題としてCP-SATで解く。
+    
+    二段階最適化:
+      第一段階: 呼び出し元でセクター/市場フィルタ＋スコアソート済み
+      第二段階: 本関数でリスク制約を適用
+        - ボラティリティ上限（プレフィルタ）
+        - 集中投資制限（ソルバー制約）
     """
+    if risk_constraints is None:
+        risk_constraints = {}
+    
+    max_volatility = risk_constraints.get('max_volatility', None)
+    max_concentration = risk_constraints.get('max_concentration', None)
+    
     print("-" * 50)
     print(f"【投資最適化】予算: {budget:,} 円 の範囲で期待利益を最大化します...")
     
+    # ── 第二段階: ボラティリティ・プレフィルタ ──
+    filtered_out = []
+    if max_volatility is not None:
+        filtered_candidates = []
+        for data in candidates:
+            if data.get('volatility', 0) > max_volatility:
+                filtered_out.append(data)
+            else:
+                filtered_candidates.append(data)
+        if filtered_out:
+            print(f"  ⚠ ボラティリティ > {max_volatility} の銘柄を {len(filtered_out)} 社除外:")
+            for f in filtered_out:
+                print(f"    - {f['name']} ({f['ticker']}): ボラティリティ {f.get('volatility', 0):.3f}")
+        candidates = filtered_candidates
+    
+    if not candidates:
+        print("リスク制約を適用した結果、有効な候補がなくなりました。制約を緩めてください。")
+        return {
+            'success': False,
+            'message': 'リスク制約（ボラティリティ上限）を適用した結果、有効な候補がなくなりました。制約を緩めてください。',
+            'filtered_out_count': len(filtered_out)
+        }
+    
+    print(f"  ✓ リスク制約通過銘柄数: {len(candidates)} 社")
+    
+    # ── ソルバー構築 ──
     model = cp_model.CpModel()
     
+    # 集中投資制限を考慮した各銘柄の最大株数
     x = {}
     for data in candidates:
         max_shares = int(budget // data['share_price'])
         if max_shares < 0: max_shares = 0
-        x[data['ticker']] = model.NewIntVar(0, max_shares, f"x_{data['ticker']}")
         
+        # 集中投資制限: 1銘柄あたりの投資額を予算の max_concentration 以下に制限
+        if max_concentration is not None:
+            max_cost_per_stock = int(budget * max_concentration)
+            max_shares_by_concentration = int(max_cost_per_stock // data['share_price'])
+            max_shares = min(max_shares, max_shares_by_concentration)
+        
+        x[data['ticker']] = model.NewIntVar(0, max_shares, f"x_{data['ticker']}")
+    
+    # 予算制約
     total_cost_expr = []
     for data in candidates:
         total_cost_expr.append(x[data['ticker']] * data['share_price'])
     model.Add(sum(total_cost_expr) <= budget)
     
+    # 目的関数: 期待利益の最大化
     total_profit_expr = []
     for data in candidates:
         total_profit_expr.append(x[data['ticker']] * data['share_profit'])
@@ -70,11 +118,13 @@ def optimize_portfolio(candidates, budget):
             'portfolio': portfolio,
             'total_invested': total_invested,
             'expected_profit': expected_profit,
-            'remaining_budget': budget - total_invested
+            'remaining_budget': budget - total_invested,
+            'filtered_out_count': len(filtered_out)
         }
     else:
         print("予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。")
         return {
             'success': False,
-            'message': '予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。'
+            'message': '予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。',
+            'filtered_out_count': len(filtered_out)
         }

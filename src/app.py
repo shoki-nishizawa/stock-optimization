@@ -30,6 +30,13 @@ selected_sort_label = st.sidebar.selectbox("スクリーニング基準", list(s
 
 top_n = st.sidebar.slider("最適化にかける上位候補数", min_value=3, max_value=30, value=10)
 
+# リスク制約セクション
+st.sidebar.header("🛡️ リスク制約")
+max_volatility = st.sidebar.slider("ボラティリティ上限", min_value=0.10, max_value=0.50, value=0.20, step=0.05,
+                                    help="年間ボラティリティがこの値を超える銘柄を候補から除外します")
+max_concentration = st.sidebar.slider("1銘柄あたりの投資上限 (%)", min_value=5, max_value=50, value=20, step=5,
+                                       help="1銘柄への投資額が予算のこの割合を超えないようにします") / 100.0
+
 if st.sidebar.button("最適化を実行", type="primary"):
     with st.spinner('データを取得・計算しています... (数秒〜数十秒かかります)'):
         # configの代わりとなる設定辞書の構築
@@ -62,9 +69,18 @@ if st.sidebar.button("最適化を実行", type="primary"):
         
         # 3. 最適化実行 (optimizer.py)
         st.subheader("💎 最適化されたポートフォリオ")
-        result = optimizer.optimize_portfolio(candidates, budget)
+        risk_constraints = {
+            'max_volatility': max_volatility,
+            'max_concentration': max_concentration
+        }
+        result = optimizer.optimize_portfolio(candidates, budget, risk_constraints)
         
         if result['success']:
+            # リスク制約によるフィルタ情報
+            filtered_count = result.get('filtered_out_count', 0)
+            if filtered_count > 0:
+                st.info(f"🛡️ リスク制約により {filtered_count} 銘柄を候補から除外しました（ボラティリティ > {max_volatility}）")
+            
             # メトリクス表示
             col1, col2, col3 = st.columns(3)
             col1.metric("合計購入金額", f"¥{result['total_invested']:,}")

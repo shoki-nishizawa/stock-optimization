@@ -12,6 +12,7 @@ def main():
     budget = config.get("budget", 1_000_000)
     filter_config = config.get("filter", {})
     strategy_config = config.get("strategy", {})
+    risk_constraints = config.get("risk_constraints", {})
     
     # 1. JPXから全件抽出してフィルタ
     ticker_dict = data_loader.get_jpx_tickers(filter_config)
@@ -25,8 +26,8 @@ def main():
     # 3. リストに上がった候補を可視化
     visualizer.plot_candidates(candidates, "candidate_trends.png")
         
-    # 4. ナップサック問題による最適化 (OR-Tools)
-    optimizer.optimize_portfolio(candidates, budget)
+    # 4. ナップサック問題による最適化 (OR-Tools) + リスク制約
+    optimizer.optimize_portfolio(candidates, budget, risk_constraints)
 
 if __name__ == "__main__":
     main()

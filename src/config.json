@@ -7,5 +7,9 @@
   "strategy": {
     "sort_by": "volatility_high",
     "top_n": 10
+  },
+  "risk_constraints": {
+    "max_volatility": 0.2,
+    "max_concentration": 0.2
   }
 }
