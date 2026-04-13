@@ -14,36 +14,19 @@ def optimize_portfolio(candidates, budget, risk_constraints=None):
     if risk_constraints is None:
         risk_constraints = {}
     
-    max_volatility = risk_constraints.get('max_volatility', None)
     max_concentration = risk_constraints.get('max_concentration', None)
     
     print("-" * 50)
     print(f"【投資最適化】予算: {budget:,} 円 の範囲で期待利益を最大化します...")
     
-    # ── 第二段階: ボラティリティ・プレフィルタ ──
-    filtered_out = []
-    if max_volatility is not None:
-        filtered_candidates = []
-        for data in candidates:
-            if data.get('volatility', 0) > max_volatility:
-                filtered_out.append(data)
-            else:
-                filtered_candidates.append(data)
-        if filtered_out:
-            print(f"  ⚠ ボラティリティ > {max_volatility} の銘柄を {len(filtered_out)} 社除外:")
-            for f in filtered_out:
-                print(f"    - {f['name']} ({f['ticker']}): ボラティリティ {f.get('volatility', 0):.3f}")
-        candidates = filtered_candidates
-    
     if not candidates:
-        print("リスク制約を適用した結果、有効な候補がなくなりました。制約を緩めてください。")
+        print("有効な候補がありません。")
         return {
             'success': False,
-            'message': 'リスク制約（ボラティリティ上限）を適用した結果、有効な候補がなくなりました。制約を緩めてください。',
-            'filtered_out_count': len(filtered_out)
+            'message': '有効な候補がありません。制約を緩めてください。'
         }
     
-    print(f"  ✓ リスク制約通過銘柄数: {len(candidates)} 社")
+    print(f"  ✓ 候補銘柄数: {len(candidates)} 社")
     
     # ── ソルバー構築 ──
     model = cp_model.CpModel()
@@ -118,13 +101,11 @@ def optimize_portfolio(candidates, budget, risk_constraints=None):
             'portfolio': portfolio,
             'total_invested': total_invested,
             'expected_profit': expected_profit,
-            'remaining_budget': budget - total_invested,
-            'filtered_out_count': len(filtered_out)
+            'remaining_budget': budget - total_invested
         }
     else:
         print("予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。")
         return {
             'success': False,
-            'message': '予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。',
-            'filtered_out_count': len(filtered_out)
+            'message': '予算内で有効な最適解が見つかりませんでした（株価が高すぎて一単元も買えない等）。'
         }

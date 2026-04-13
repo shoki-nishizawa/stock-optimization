@@ -114,17 +114,19 @@ def extract_candidates(ticker_dict, strategy_config):
             'history': None # 後で取得する
         })
         
-    sort_mode = strategy_config.get("sort_by", "return_high")
+    # ── ボラティリティ・プレフィルタ（第二段階の設定を第一段階に反映）──
+    max_volatility = strategy_config.get("max_volatility", None)
+    if max_volatility is not None:
+        before_count = len(stock_stats)
+        stock_stats = [s for s in stock_stats if s['volatility'] <= max_volatility]
+        filtered = before_count - len(stock_stats)
+        if filtered > 0:
+            print(f"  ⚠ ボラティリティ > {max_volatility} の銘柄を {filtered} 社除外")
     
-    if sort_mode == "volatility_high":
-        stock_stats.sort(key=lambda x: x['volatility'], reverse=True)
-    elif sort_mode == "fundamental_high":
-        stock_stats.sort(key=lambda x: x['custom_return'], reverse=True)
-        # 上位候補の価値を独自スコアベースに上書きする
-        for s in stock_stats:
-            s['share_profit'] = s['custom_profit']
-    else:
-        stock_stats.sort(key=lambda x: x['annual_return'], reverse=True)
+    # ── ファンダメンタルズ総合スコアでソート ──
+    stock_stats.sort(key=lambda x: x['custom_return'], reverse=True)
+    for s in stock_stats:
+        s['share_profit'] = s['custom_profit']
         
     top_n = strategy_config.get("top_n", 10)
     candidates = stock_stats[:top_n]
