@@ -79,8 +79,8 @@ if st.sidebar.button("最適化を実行", type="primary"):
             df_portfolio = pd.DataFrame(result['portfolio'])
             
             if not df_portfolio.empty:
-                df_portfolio = df_portfolio[['ticker', 'name', 'analyst_rating', 'shares', 'cost', 'pe', 'roe', 'custom_return', 'profit']]
-                df_portfolio.columns = ['コード', '銘柄名', 'アナリスト評価', '購入株数', '購入金額(円)', 'PER', 'ROE', '予想利益率', '合計予想利益額(円)']
+                df_portfolio = df_portfolio[['ticker', 'name', 'share_price', 'analyst_rating', 'shares', 'cost', 'pe', 'roe', 'custom_return', 'profit']]
+                df_portfolio.columns = ['コード', '銘柄名', '現在株価(円)', 'アナリスト評価', '購入株数', '購入金額(円)', 'PER', 'ROE', '予想利益率', '合計予想利益額(円)']
                 
                 # 条件付きカラーリング
                 def color_per(val):
@@ -111,6 +111,7 @@ if st.sidebar.button("最適化を実行", type="primary"):
                     .map(color_roe, subset=['ROE'])
                     .map(color_analyst, subset=['アナリスト評価'])
                     .format({
+                        '現在株価(円)': '{:,.0f}',
                         'PER': '{:.1f}倍',
                         'ROE': lambda x: f'{x*100:.1f}%',
                         '予想利益率': lambda x: f'{x*100:.1f}%',

@@ -82,6 +82,7 @@ def optimize_portfolio(candidates, budget, risk_constraints=None):
                 portfolio.append({
                     'ticker': data['ticker'],
                     'name': data['name'],
+                    'share_price': data['share_price'],
                     'shares': shares,
                     'cost': cost,
                     'profit': profit,
