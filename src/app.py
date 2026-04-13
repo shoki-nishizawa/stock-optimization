@@ -107,9 +107,9 @@ if st.sidebar.button("最適化を実行", type="primary"):
                 
                 # Styler適用
                 styled = (df_portfolio.style
-                    .applymap(color_per, subset=['PER'])
-                    .applymap(color_roe, subset=['ROE'])
-                    .applymap(color_analyst, subset=['アナリスト評価'])
+                    .map(color_per, subset=['PER'])
+                    .map(color_roe, subset=['ROE'])
+                    .map(color_analyst, subset=['アナリスト評価'])
                     .format({
                         'PER': '{:.1f}倍',
                         'ROE': lambda x: f'{x*100:.1f}%',
