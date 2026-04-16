@@ -1,5 +1,4 @@
-import json
-import yfinance as yf
+import yfinance as yf   # 株価取得
 import pandas as pd
 import numpy as np
 import os
@@ -7,21 +6,15 @@ import streamlit as st
 
 DB_PATH = "data/stock_database.csv"
 
-def load_config(config_path="config.json"):
-    if os.path.exists(config_path):
-        with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
 
 @st.cache_data
 def get_jpx_tickers(filter_config):
     """
     構築済みのローカルCSVデータベースから銘柄一覧と基本情報を取得し、
-    条件に基づいてフィルタリングし、証券コードと企業名の辞書を返す。
+    条件（filter_config）に基づいてフィルタリングし、証券コードと企業名の辞書を返す。
     """
     if not os.path.exists(DB_PATH):
-        print(f"エラー: データベース({DB_PATH})が見つかりません。先にスクリプトを実行してください。")
-        # 例外を投げずに空を返し、UI側でエラー表示させる
+        print(f"エラー: データベース({DB_PATH})が見つかりません。")
         return {}
 
     df = pd.read_csv(DB_PATH)
@@ -37,7 +30,7 @@ def get_jpx_tickers(filter_config):
         
     ticker_dict = {}
     for _, row in df.iterrows():
-        ticker_dict[row['ticker']] = row['name']
+        ticker_dict[row['ticker']] = row['name']    # 証券コード: 企業名 の辞書を作成
             
     print(f"データベースから条件に合致する銘柄を {len(ticker_dict)} 社抽出しました。")
     return ticker_dict
@@ -45,7 +38,7 @@ def get_jpx_tickers(filter_config):
 @st.cache_data
 def extract_candidates(ticker_dict, strategy_config):
     """
-    ローカルCSVから全銘柄のファンダメンタルズ情報を読み込み、ソートロジックを適用。
+    ローカルCSVから、第一段階でフィルタリングされた銘柄（ticker_dict）のファンダメンタルズ情報を読み込み、独自のスコア計算とソートロジックを適用。
     最終的な上位N社だけリアルタイムに過去1年分の株価履歴（グラフ用）を取得して返す。
     """
     if not os.path.exists(DB_PATH) or not ticker_dict:
@@ -68,32 +61,32 @@ def extract_candidates(ticker_dict, strategy_config):
         if pd.isna(current_price) or current_price <= 0 or current_price > 1000000:
             continue
             
-        share_price = current_price
-        annual_return = float(row['annual_return'])
-        volatility = float(row['volatility'])
-        pe = float(row['pe']) if pd.notna(row['pe']) else 0.0
-        roe = float(row['roe']) if pd.notna(row['roe']) else 0.0
+        share_price               = current_price
+        annual_return             = float(row['annual_return'])
+        volatility                = float(row['volatility'])
+        pe                        = float(row['pe']) if pd.notna(row['pe']) else 0.0
+        roe                       = float(row['roe']) if pd.notna(row['roe']) else 0.0
         annual_dividend_per_share = float(row['annual_dividend_per_share']) if pd.notna(row['annual_dividend_per_share']) else 0.0
-        analyst_rating = str(row['analyst_rating'])
+        analyst_rating            = str(row['analyst_rating'])
         
-        dividend_yield = annual_dividend_per_share / current_price if current_price > 0 else 0.0
-        expected_dividend = annual_dividend_per_share
-        
-        expected_capital_gain = share_price * annual_return
-        total_profit = expected_capital_gain + expected_dividend
+        dividend_yield = annual_dividend_per_share / current_price  # 予想配当利回り
+        expected_dividend = annual_dividend_per_share               # 予想配当額
+
+        expected_capital_gain = share_price * annual_return         # 株価上昇による利益
+        total_profit = expected_capital_gain + expected_dividend    # 予想総利益
         
         # 独自ファンダメンタルズスコアの算出
         if pe > 0:
-            per_contribution = (15 - pe) / 100
+            per_contribution = (15 - pe) / 100      # PER(株価収益率)は15倍を基準。0.01倍して％スケールに合わせる
         else:
             per_contribution = -0.10
             
-        roe_contribution = roe - 0.10 if roe != 0.0 else 0.0
+        roe_contribution = roe - 0.10 if roe != 0.0 else 0.0  # ROE(自己資本利益率)は10%を基準
             
-        momentum_contribution = annual_return * 0.2
+        momentum_contribution = annual_return * 0.2  # 株価上昇率に0.2倍の係数をかけて調整
         
-        custom_expected_return = dividend_yield + per_contribution + roe_contribution + momentum_contribution
-        custom_profit = share_price * custom_expected_return
+        custom_score_rate = dividend_yield + per_contribution + roe_contribution + momentum_contribution    # コスパのスコア
+        custom_score_per_share = share_price * custom_score_rate    # 一株当たりのスコア（これをソルバーで最大化する）
         
         stock_stats.append({
             'ticker': tk,
@@ -104,10 +97,10 @@ def extract_candidates(ticker_dict, strategy_config):
             'dividend_yield': dividend_yield,
             'pe': pe,
             'roe': roe,
-            'custom_return': custom_expected_return,
+            'custom_score_rate': custom_score_rate,
             'expected_capital_gain': int(expected_capital_gain),
             'expected_dividend': int(expected_dividend),
-            'custom_profit': int(custom_profit),
+            'custom_score_per_share': int(custom_score_per_share),
             'share_profit': int(total_profit),
             'volatility': volatility,
             'analyst_rating': analyst_rating,
@@ -123,10 +116,8 @@ def extract_candidates(ticker_dict, strategy_config):
         if filtered > 0:
             print(f"  ⚠ ボラティリティ > {max_volatility} の銘柄を {filtered} 社除外")
     
-    # ── ファンダメンタルズ総合スコアでソート ──
-    stock_stats.sort(key=lambda x: x['custom_return'], reverse=True)
-    for s in stock_stats:
-        s['share_profit'] = s['custom_profit']
+    # ── スコアでソート ──
+    stock_stats.sort(key=lambda x: x['custom_score_rate'], reverse=True)    
         
     top_n = strategy_config.get("top_n", 10)
     candidates = stock_stats[:top_n]
@@ -140,7 +131,8 @@ def extract_candidates(ticker_dict, strategy_config):
         
         for c in candidates:
             tk = c['ticker']
-            if is_multi:
+            # 銘柄が1つの場合と複数で取得した場合で処理を分ける（yfinanceの仕様）
+            if is_multi:    
                 if tk in data.columns.levels[0] and 'Close' in data[tk]:
                     c['history'] = data[tk]['Close'].dropna()
             else:

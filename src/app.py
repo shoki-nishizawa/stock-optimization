@@ -8,7 +8,7 @@ import visualizer
 st.set_page_config(page_title="日本株ポートフォリオ最適化", page_icon="📈", layout="wide")
 
 st.title("📈 日本株ポートフォリオ最適化ツール")
-st.markdown("予算と投資戦略を設定すると、AIソルバー（OR-Tools）が最も期待利益の大きい銘柄の組み合わせを計算します。")
+st.markdown("予算と投資戦略を設定すると、最も期待利益の大きい銘柄の組み合わせを計算します。")
 
 # サイドバー設定
 st.sidebar.header("⚙️ 最適化設定")
@@ -26,7 +26,7 @@ top_n = st.sidebar.slider("最適化にかける上位候補数", min_value=3, m
 # リスク制約セクション
 st.sidebar.header("🛡️ リスク制約")
 max_volatility = st.sidebar.slider("ボラティリティ上限", min_value=0.10, max_value=0.50, value=0.20, step=0.05,
-                                    help="年間ボラティリティがこの値を超える銘柄を候補から除外します")
+                                    help="年間ボラティリティ(株価変動率)がこの値を超える銘柄を候補から除外します")
 max_concentration = st.sidebar.slider("1銘柄あたりの投資上限 (%)", min_value=5, max_value=50, value=20, step=5,
                                        help="1銘柄への投資額が予算のこの割合を超えないようにします") / 100.0
 
@@ -57,7 +57,7 @@ if st.sidebar.button("最適化を実行", type="primary"):
             
         # 2. グラフ描画 (visualizer.py)
         st.subheader("📊 上位候補銘柄の過去1年の株価推移")
-        fig = visualizer.plot_candidates(candidates, output_file=None)
+        fig = visualizer.plot_candidates(candidates)
         st.pyplot(fig)
         
         # 3. 最適化実行 (optimizer.py)
@@ -79,8 +79,8 @@ if st.sidebar.button("最適化を実行", type="primary"):
             df_portfolio = pd.DataFrame(result['portfolio'])
             
             if not df_portfolio.empty:
-                df_portfolio = df_portfolio[['ticker', 'name', 'share_price', 'analyst_rating', 'shares', 'cost', 'pe', 'roe', 'custom_return', 'profit']]
-                df_portfolio.columns = ['コード', '銘柄名', '現在株価(円)', 'アナリスト評価', '購入株数', '購入金額(円)', 'PER', 'ROE', '予想利益率', '合計予想利益額(円)']
+                df_portfolio = df_portfolio[['ticker', 'name', 'share_price', 'analyst_rating', 'shares', 'cost', 'pe', 'roe', 'custom_score_rate', 'profit']]
+                df_portfolio.columns = ['コード', '銘柄名', '現在株価(円)', 'アナリスト評価', '購入株数', '購入金額(円)', 'PER', 'ROE', '独自スコア', '合計予想利益額(円)']
                 
                 # 条件付きカラーリング
                 def color_per(val):
@@ -105,7 +105,7 @@ if st.sidebar.button("最適化を実行", type="primary"):
                     }
                     return rating_colors.get(val, 'color: #888888')
                 
-                # Styler適用
+                # 表示形式を整える
                 styled = (df_portfolio.style
                     .map(color_per, subset=['PER'])
                     .map(color_roe, subset=['ROE'])
@@ -114,7 +114,7 @@ if st.sidebar.button("最適化を実行", type="primary"):
                         '現在株価(円)': '{:,.0f}',
                         'PER': '{:.1f}倍',
                         'ROE': lambda x: f'{x*100:.1f}%',
-                        '予想利益率': lambda x: f'{x*100:.1f}%',
+                        '独自スコア': lambda x: f'{x*100:.1f}pt',
                         '購入金額(円)': '{:,.0f}',
                         '合計予想利益額(円)': '{:,.0f}',
                     })
