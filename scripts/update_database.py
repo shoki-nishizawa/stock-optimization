@@ -140,7 +140,9 @@ def update_database():
         current_price = close_series.iloc[-1]
         start_price = close_series.iloc[0]
         
-        if pd.isna(current_price) or current_price <= 0 or current_price > 1000000:  # バグっぽい価格はスキップ
+        # 0円除算（ゼロ除算）による無限大エラーを防ぐため、start_priceの異常値も一緒に弾く
+        if (pd.isna(current_price) or current_price <= 0 or current_price > 1000000 or
+            pd.isna(start_price)   or start_price <= 0):
             continue
             
         annual_return = float((current_price - start_price) / start_price)  # 一年前と比較した変化率

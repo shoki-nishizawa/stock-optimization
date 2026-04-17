@@ -58,7 +58,7 @@ def extract_candidates(ticker_dict, strategy_config):
         current_price = float(row['current_price'])
         
         # 株価バグ等で異常な値の場合は除外
-        if pd.isna(current_price) or current_price <= 0 or current_price > 1000000:
+        if pd.isna(current_price) or current_price <= 0 or current_price > 1000000 or pd.isna(start_price) or start_price <= 0:
             continue
             
         share_price               = current_price
