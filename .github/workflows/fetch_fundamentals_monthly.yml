@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run fetch script (Note: This may take a long time or get blocked)
+      - name: "Run fetch script (Note: This may take a long time or get blocked)"
         run: python scripts/fetch_fundamentals_local.py
 
       - name: Commit and push partial or full progress
