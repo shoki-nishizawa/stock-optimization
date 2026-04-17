@@ -65,7 +65,12 @@ def extract_candidates(ticker_dict, strategy_config):
         annual_return             = float(row['annual_return'])
         volatility                = float(row['volatility'])
         pe                        = float(row['pe']) if pd.notna(row['pe']) else 0.0
+        if pe == float('inf') or pe == float('-inf'):
+            pe = 0.0
+        
         roe                       = float(row['roe']) if pd.notna(row['roe']) else 0.0
+        if roe == float('inf') or roe == float('-inf'):
+            roe = 0.0
         annual_dividend_per_share = float(row['annual_dividend_per_share']) if pd.notna(row['annual_dividend_per_share']) else 0.0
         analyst_rating            = str(row['analyst_rating'])
         
