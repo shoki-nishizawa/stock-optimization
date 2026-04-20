@@ -29,6 +29,7 @@ streamlit run src/app.py
 ```
 
 ブラウザが自動的に開き、サイドバーから以下の項目をGUIで設定できます。
+![alt text](img/image.png)
 
 | 項目 | 説明 |
 |---|---|
@@ -40,6 +41,10 @@ streamlit run src/app.py
 | 集中投資制限 (%) | 1銘柄への投資額が予算のこの割合を超えないようにする（デフォルト: 20%） |
 
 「最適化を実行」ボタンを押すと、候補銘柄の株価推移グラフ＋最適化されたポートフォリオ表（PER・ROE・アナリスト評価付き）が表示されます。
+
+![alt text](img/image-1.png)
+
+![alt text](img/image-2.png)
 
 ## データ更新の仕組み（GitHub Actions）
 
