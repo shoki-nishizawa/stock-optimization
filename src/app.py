@@ -127,8 +127,9 @@ if st.sidebar.button("最適化を実行", type="primary"):
                 )
                 
                 # テーブル表示
-                st.dataframe(styled, hide_index=True, use_container_width=True)
+                st.dataframe(styled, hide_index=True, width='stretch')
                 st.success("最適化計算が完了しました！ サイドバーから条件を変えて再シミュレーションできます。")
+                st.info("⚠️ **免責事項 / 注意書き**\n\n本ツールが算出する「期待利益」および「ポートフォリオ」は、過去の実績や独自のアルゴリズムに基づくあくまでシミュレーション結果であり、将来の運用成果を一切保証するものではありません。実際の投資判断は、必ずご自身のリスク許容度に合わせて**自己責任**でお願いいたします。")
             else:
                 st.warning("予算内で買える銘柄がありませんでした。")
         else:
